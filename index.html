@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Escáner de entrada — Cursos de Orientación Ministerial</title>
+<link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --olivo:#2F3618; --olivo-alto:#414A22; --olivo-foco:#4E5A28;
+    --pergamino:#F4F2EC; --dorado:#C4A03C; --dorado-luz:#E6CE84;
+    --verde-gris:#A3AC8C;
+    --ok:#8FB84E; --aviso:#E0A93B; --mal:#C4614C;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--olivo); color:var(--pergamino);
+    font-family:'Karla',system-ui,sans-serif; font-size:16px; line-height:1.5;
+    min-height:100vh; padding:20px 16px 40px;
+  }
+  .lienzo{ max-width:520px; margin:0 auto; }
+  .rotulo{ font-size:11px; font-weight:600; letter-spacing:.26em;
+    text-transform:uppercase; color:var(--dorado-luz); margin:0 0 10px; }
+  h1{ font-size:24px; font-weight:600; margin:0 0 4px; }
+  .sub{ color:var(--verde-gris); font-size:14px; margin:0 0 22px; }
+
+  label{ display:block; font-size:11px; font-weight:600; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--verde-gris); margin:0 0 6px; }
+  input, select{
+    width:100%; padding:13px 14px; font-family:'Karla',sans-serif; font-size:16px;
+    color:var(--pergamino); background:var(--olivo-alto);
+    border:1px solid rgba(244,242,236,.16); border-radius:2px; margin-bottom:16px;
+  }
+  select{ appearance:none; }
+  input:focus, select:focus{ outline:none; border-color:var(--dorado); background:var(--olivo-foco); }
+  button{
+    width:100%; padding:15px; font-family:'Karla',sans-serif; font-size:14px;
+    font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--olivo); background:var(--dorado-luz);
+    border:0; border-radius:2px; cursor:pointer; margin-bottom:10px;
+  }
+  button.secundario{ background:transparent; color:var(--dorado-luz);
+    border:1px solid rgba(196,160,60,.5); }
+  .error{ background:rgba(196,97,76,.18); border-left:3px solid var(--mal);
+    padding:11px 13px; font-size:14px; margin-bottom:16px; }
+
+  #pantallaEscaneo{ display:none; }
+  .barra{ display:flex; justify-content:space-between; align-items:center;
+    gap:10px; font-size:12px; color:var(--verde-gris); margin-bottom:12px; }
+  .barra strong{ color:var(--dorado-luz); font-weight:600; }
+
+  #lector{ width:100%; border-radius:3px; overflow:hidden; background:#000; }
+  #lector video{ width:100% !important; height:auto !important; display:block; }
+
+  .resultado{
+    margin-top:14px; border-radius:3px; padding:20px 18px; text-align:center;
+    background:var(--olivo-alto); min-height:132px;
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  .resultado.ok{    background:var(--ok);    color:#1E2A0C; }
+  .resultado.aviso{ background:var(--aviso); color:#3A2A05; }
+  .resultado.mal{   background:var(--mal);   color:#FFF3F0; }
+  .r-estado{ font-size:13px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; }
+  .r-nombre{ font-size:27px; font-weight:700; line-height:1.15; margin:8px 0 4px; }
+  .r-datos{ font-size:15px; opacity:.85; }
+  .r-espera{ color:var(--verde-gris); font-size:15px; }
+
+  .contadores{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:14px 0; text-align:center; }
+  .contador{ background:var(--olivo-alto); border-radius:3px; padding:12px 6px; }
+  .contador span{ display:block; font-family:'IBM Plex Mono',monospace;
+    font-size:22px; color:var(--dorado-luz); }
+  .contador em{ font-style:normal; font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--verde-gris); }
+
+  .fila{ display:flex; gap:8px; margin-bottom:10px; }
+  .fila button{ margin:0; }
+  #busqueda{ display:none; margin-top:8px; }
+  .hallazgo{ background:var(--olivo-alto); padding:12px 14px; border-radius:3px;
+    margin-bottom:8px; cursor:pointer; }
+  .hallazgo b{ display:block; font-size:17px; }
+  .hallazgo small{ color:var(--verde-gris); }
+  #campoFisico{ position:absolute; left:-9999px; }
+  .aviso-sync{ font-size:13px; text-align:center; color:var(--verde-gris); margin-top:6px; }
+  #avisoModo{ text-align:center; padding:11px; border-radius:3px; margin-bottom:10px;
+    font-weight:700; font-size:13px; letter-spacing:.16em; text-transform:uppercase; }
+  .modo-entrada{ background:rgba(143,184,78,.18); color:var(--ok);
+    border:1px solid rgba(143,184,78,.45); }
+  .modo-salida{ background:var(--aviso); color:#3A2A05; border:1px solid #B8871F; }
+  body.salida{ background:#4A3A12; }
+</style>
+</head>
+<body>
+<div class="lienzo">
+
+  <!-- ============ ACCESO ============ -->
+  <section id="pantallaAcceso">
+    <p class="rotulo">Escáner de entrada · v4</p>
+    <h1 id="tituloEvento">Cursos de Orientación Ministerial</h1>
+    <p class="sub" id="subEvento">Santa Cena Agosto 2026</p>
+
+    <div id="cajaError" class="error" style="display:none"></div>
+
+    <label for="pin">PIN de encargado</label>
+    <input id="pin" type="tel" inputmode="numeric" autocomplete="off" placeholder="••••">
+
+    <div id="camposSesion" style="display:none">
+      <label for="encargado">Su nombre</label>
+      <input id="encargado" type="text" placeholder="Quién está escaneando">
+
+      <label for="punto">Punto de entrada</label>
+      <select id="punto"></select>
+
+      <label for="sesion">Sesión</label>
+      <select id="sesion"></select>
+    </div>
+
+    <button id="botonAcceso" onclick="entrar()">Continuar</button>
+  </section>
+
+  <!-- ============ ESCANEO ============ -->
+  <section id="pantallaEscaneo">
+    <div class="barra">
+      <span><strong id="bPunto"></strong></span>
+      <span id="bConexion">—</span>
+    </div>
+
+    <label for="sesionActiva">Toma de asistencia en curso</label>
+    <select id="sesionActiva" onchange="cambiarSesion()"></select>
+
+    <div id="avisoModo" class="modo-entrada">Registrando ENTRADAS</div>
+    <button class="secundario" onclick="alternarModo()" id="botonModo">Cambiar a salidas</button>
+
+    <div id="lector"></div>
+
+    <div class="resultado" id="resultado">
+      <div class="r-espera">Apunte la cámara al código del pase.</div>
+    </div>
+
+    <div class="contadores">
+      <div class="contador"><span id="cValidos">0</span><em>Ingresos</em></div>
+      <div class="contador"><span id="cRepetidos">0</span><em>Repetidos</em></div>
+      <div class="contador"><span id="cPendientes">0</span><em>Por subir</em></div>
+    </div>
+
+    <div class="fila">
+      <button class="secundario" onclick="alternarBusqueda()">Buscar por nombre</button>
+      <button class="secundario" onclick="sincronizar(true)">Sincronizar</button>
+    </div>
+
+    <div id="busqueda">
+      <input id="textoBusqueda" type="text" placeholder="Escriba el nombre o el folio" oninput="buscar()">
+      <div id="hallazgos"></div>
+    </div>
+
+    <p class="aviso-sync" id="avisoPadron"></p>
+
+    <button class="secundario" onclick="salir()">Cerrar sesión de escaneo</button>
+  </section>
+
+</div>
+<input id="campoFisico" autocomplete="off">
+
+<script>
+/* ================================================================
+   DIRECCION DE SU APLICACION DE GOOGLE
+   Si algun dia vuelve a publicar con una direccion distinta,
+   cambiela aqui. Debe terminar en /exec
+   ================================================================ */
+var URL_APP = 'https://script.google.com/macros/s/AKfycbwTxSBKZXAqPddbpyoSHO2HUg_ecRRKckImeuk8b9foxpseZJx7AWWScyTfWGnsn3o5NA/exec';
+
+var PIN = '';
+var CFG = null;
+var padron = {};
+var cola = [];
+var marcados = {};
+var lector = null;
+var ultimoCodigo = '';
+var ultimoMomento = 0;
+var contadores = { validos:0, repetidos:0 };
+var sesionActual = {};
+
+var K = { padron:'cm_padron', cola:'cm_cola', marcados:'cm_marcados',
+          sesion:'cm_sesion', cont:'cm_contadores', fecha:'cm_padron_fecha' };
+
+/* ---------------- puente con Google ---------------- */
+function llamar(params, exito, fallo){
+  var cb = 'cb' + Date.now() + Math.floor(Math.random() * 10000);
+  var etiqueta = document.createElement('script');
+  var reloj = setTimeout(function(){ terminar(); if (fallo) { fallo('Sin respuesta.'); } }, 25000);
+
+  function terminar(){
+    clearTimeout(reloj);
+    try { delete window[cb]; } catch(e){ window[cb] = undefined; }
+    if (etiqueta.parentNode) { etiqueta.parentNode.removeChild(etiqueta); }
+  }
+
+  window[cb] = function(r){
+    terminar();
+    if (r && r.ok === false) { if (fallo) { fallo(r.error); } }
+    else if (exito) { exito(r); }
+  };
+
+  var partes = [];
+  for (var k in params){
+    if (params.hasOwnProperty(k)) {
+      partes.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+    }
+  }
+  partes.push('callback=' + cb);
+
+  etiqueta.src = URL_APP + '?' + partes.join('&');
+  etiqueta.onerror = function(){ terminar(); if (fallo) { fallo('Sin conexión.'); } };
+  document.body.appendChild(etiqueta);
+}
+
+/* ---------------- almacenamiento local ---------------- */
+function guardar(clave, valor){
+  try { localStorage.setItem(clave, JSON.stringify(valor)); } catch(e){}
+}
+function leer(clave, porDefecto){
+  try { var v = localStorage.getItem(clave); return v ? JSON.parse(v) : porDefecto; }
+  catch(e){ return porDefecto; }
+}
+
+/* ---------------- acceso ---------------- */
+function mostrarError(msg){
+  var c = document.getElementById('cajaError');
+  c.textContent = msg; c.style.display = 'block';
+}
+
+function entrar(){
+  var pin = document.getElementById('pin').value.trim();
+  if (!pin) { mostrarError('Escriba el PIN.'); return; }
+  document.getElementById('cajaError').style.display = 'none';
+
+  var boton = document.getElementById('botonAcceso');
+
+  if (!CFG){
+    boton.disabled = true; boton.textContent = 'Comprobando…';
+    llamar({ api:'config', pin:pin },
+      function(c){
+        PIN = pin; CFG = c;
+        document.getElementById('tituloEvento').textContent = c.evento;
+        document.getElementById('subEvento').textContent    = c.subtitulo;
+        llenar('punto',  c.puntos);
+        llenar('sesion', etiquetasDe(c.sesiones));
+        document.getElementById('camposSesion').style.display = 'block';
+        boton.disabled = false; boton.textContent = 'Iniciar escaneo';
+      },
+      function(msg){
+        boton.disabled = false; boton.textContent = 'Continuar';
+        mostrarError(msg || 'No se pudo comprobar el PIN. Revise su conexión.');
+      });
+    return;
+  }
+
+  var encargado = document.getElementById('encargado').value.trim();
+  if (!encargado) { mostrarError('Escriba su nombre.'); return; }
+
+  sesionActual = {
+    encargado : encargado,
+    punto     : document.getElementById('punto').value,
+    sesion    : document.getElementById('sesion').value,
+    pin       : PIN
+  };
+  guardar(K.sesion, sesionActual);
+  iniciarEscaneo();
+}
+
+/** Acepta las sesiones como texto o como objeto {etiqueta, inicio}. */
+function etiquetaDe(s){ return (s && s.etiqueta) ? s.etiqueta : String(s); }
+function etiquetasDe(lista){ return (lista || []).map(etiquetaDe); }
+
+function llenar(id, opciones){
+  var s = document.getElementById(id);
+  s.innerHTML = '';
+  opciones.forEach(function(o){
+    var op = document.createElement('option');
+    op.value = o; op.textContent = o; s.appendChild(op);
+  });
+}
+
+/* ---------------- inicio del escaneo ---------------- */
+function iniciarEscaneo(){
+  document.getElementById('pantallaAcceso').style.display  = 'none';
+  document.getElementById('pantallaEscaneo').style.display = 'block';
+  document.getElementById('bPunto').textContent = sesionActual.punto;
+  llenar('sesionActiva', etiquetasDe(CFG.sesiones));
+  document.getElementById('sesionActiva').value = sesionActual.sesion;
+
+  padron     = leer(K.padron, {});
+  cola       = leer(K.cola, []);
+  marcados   = leer(K.marcados, {});
+  contadores = leer(K.cont, { validos:0, repetidos:0 });
+  refrescarContadores();
+  mostrarEstadoPadron();
+  bajarPadron();
+
+  arrancarCamara();
+  vigilarConexion();
+  setInterval(function(){ sincronizar(false); }, 30000);
+
+  var campo = document.getElementById('campoFisico');
+  document.addEventListener('click', function(){ campo.focus(); });
+  campo.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter'){
+      var texto = campo.value.trim();
+      campo.value = '';
+      if (texto) { procesar(texto); }
+    }
+  });
+}
+
+function arrancarCamara(){
+  if (typeof Html5Qrcode === 'undefined'){
+    pintar('mal', 'Falta la librería',
+      'No se pudo descargar el lector. Conéctese a internet y recargue la página.', '');
+    return;
+  }
+  lector = new Html5Qrcode('lector');
+  lector.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    function(texto){ procesar(texto); },
+    function(){ }
+  ).catch(function(){
+    pintar('mal', 'Sin cámara',
+      'Conceda el permiso de cámara y recargue. En iPhone y iPad use Safari.', '');
+  });
+}
+
+/* ---------------- padrón ---------------- */
+function bajarPadron(){
+  llamar({ api:'padron', pin: PIN || sesionActual.pin },
+    function(r){
+      var mapa = {};
+      r.lista.forEach(function(f){ mapa[f[0]] = [f[1], f[2], f[3], f[4], f[5]]; });
+      padron = mapa;
+      guardar(K.padron, padron);
+      guardar(K.fecha, new Date().toISOString());
+      mostrarEstadoPadron();
+    },
+    function(){ mostrarEstadoPadron(); });
+}
+
+function mostrarEstadoPadron(){
+  var n = 0;
+  for (var f in padron){ if (padron.hasOwnProperty(f)) { n++; } }
+  var fecha = leer(K.fecha, null);
+  var t = fecha ? new Date(fecha).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : 'nunca';
+  document.getElementById('avisoPadron').textContent =
+    n ? ('Lista guardada en este aparato: ' + n + ' inscritos · actualizada ' + t)
+      : 'Sin lista descargada. Conéctese a internet y presione Sincronizar.';
+}
+
+/* ---------------- procesar un código ---------------- */
+function procesar(texto){
+  var ahora = Date.now();
+  if (texto === ultimoCodigo && (ahora - ultimoMomento) < 3000) { return; }
+  ultimoCodigo = texto; ultimoMomento = ahora;
+
+  var partes = String(texto).split('|');
+  if (partes.length < 12 || partes[0] !== (CFG ? CFG.prefijo : 'CM')){
+    sonar('mal');
+    pintar('mal', 'Código no válido', 'Este código no pertenece al evento.', '');
+    return;
+  }
+
+  var folio  = partes[0] + '-' + partes[1];
+  var grado  = partes[2];
+  var nombre = partes[3];
+  var clave  = partes[11];
+  var ficha  = padron[folio];
+
+  if (!ficha){
+    sonar('mal');
+    pintar('mal', 'No aparece en la lista', nombre,
+           folio + ' · Puede haberse registrado hace poco. Presione Sincronizar.');
+    encolar(folio, grado, nombre, 'No encontrado');
+    return;
+  }
+
+  if (String(ficha[0]).toUpperCase() !== String(clave).toUpperCase()){
+    sonar('mal');
+    pintar('mal', 'Pase alterado', nombre, folio + ' · Los datos no coinciden con el registro.');
+    encolar(folio, grado, nombre, 'Alterado');
+    return;
+  }
+
+  var llave = folio + '||' + sesionActual.sesion;
+  var horaAhora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+
+  if (modo === 'Salida'){
+    sonar('aviso');
+    pintar('aviso', 'Salida anticipada', ficha[2], 'Se retira a las ' + horaAhora + '.');
+    encolar(folio, ficha[1], ficha[2], 'Válido');
+    return;
+  }
+
+  if (marcados[llave]){
+    contadores.repetidos++; guardar(K.cont, contadores); refrescarContadores();
+    sonar('aviso');
+    pintar('aviso', 'Ya había ingresado', ficha[2],
+           'Registrado a las ' + marcados[llave] + ' en esta misma toma.');
+    encolar(folio, ficha[1], ficha[2], 'Repetido');
+    return;
+  }
+
+  marcados[llave] = horaAhora;
+  guardar(K.marcados, marcados);
+  contadores.validos++; guardar(K.cont, contadores); refrescarContadores();
+
+  var punt = calcularPuntualidad();
+  sonar('ok');
+  if (punt.texto === 'Retardo'){
+    pintar('aviso', 'Puede pasar · RETARDO', ficha[2],
+           horaAhora + ' · ' + punt.minutos + ' min después del inicio');
+  } else {
+    pintar('ok', 'Puede pasar', ficha[2], ficha[1] + ' · ' + ficha[3] + ', ' + ficha[4]);
+  }
+  encolar(folio, ficha[1], ficha[2], 'Válido');
+}
+
+function encolar(folio, grado, nombre, resultado){
+  var p = (resultado === 'Válido' && modo === 'Entrada') ? calcularPuntualidad() : { texto:'', minutos:'' };
+  cola.push({
+    folio: folio, grado: grado, nombre: nombre,
+    sesion: sesionActual.sesion, punto: sesionActual.punto,
+    encargado: sesionActual.encargado, tipo: modo,
+    puntualidad: p.texto, minutos: p.minutos,
+    fechaHora: new Date().toISOString(), resultado: resultado
+  });
+  guardar(K.cola, cola);
+  refrescarContadores();
+  sincronizar(false);
+}
+
+function pintar(clase, estado, nombre, detalle){
+  var caja = document.getElementById('resultado');
+  caja.className = 'resultado ' + clase;
+  caja.innerHTML =
+    '<div class="r-estado">' + estado + '</div>' +
+    '<div class="r-nombre">' + (nombre || '') + '</div>' +
+    '<div class="r-datos">' + (detalle || '') + '</div>';
+  if (navigator.vibrate) { navigator.vibrate(clase === 'ok' ? 60 : [60,60,60]); }
+}
+
+function refrescarContadores(){
+  document.getElementById('cValidos').textContent    = contadores.validos;
+  document.getElementById('cRepetidos').textContent  = contadores.repetidos;
+  document.getElementById('cPendientes').textContent = cola.length;
+}
+
+/* ---------------- sonido ---------------- */
+var audio = null;
+function sonar(tipo){
+  try {
+    if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); }
+    var o = audio.createOscillator(), g = audio.createGain();
+    o.connect(g); g.connect(audio.destination);
+    o.frequency.value = tipo === 'ok' ? 880 : (tipo === 'aviso' ? 520 : 220);
+    g.gain.setValueAtTime(0.18, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.28);
+    o.start(); o.stop(audio.currentTime + 0.3);
+  } catch(e){}
+}
+
+/* ---------------- sincronización ---------------- */
+var sincronizando = false;
+function sincronizar(manual){
+  if (sincronizando) { return; }
+  if (!cola.length){
+    if (manual) { bajarPadron(); }
+    return;
+  }
+  sincronizando = true;
+  var lote = cola.slice(0, 5);
+
+  llamar({ api:'guardar', pin: PIN || sesionActual.pin, datos: JSON.stringify(lote) },
+    function(){
+      cola = cola.slice(lote.length);
+      guardar(K.cola, cola);
+      refrescarContadores();
+      sincronizando = false;
+      if (cola.length) { sincronizar(false); }
+      else if (manual) { bajarPadron(); }
+    },
+    function(){ sincronizando = false; });
+}
+
+function vigilarConexion(){
+  function pintarConexion(){
+    var e = document.getElementById('bConexion');
+    e.textContent = navigator.onLine ? 'En línea' : 'Sin señal · se guarda aquí';
+    e.style.color = navigator.onLine ? '#8FB84E' : '#E0A93B';
+  }
+  window.addEventListener('online',  function(){ pintarConexion(); sincronizar(false); });
+  window.addEventListener('offline', pintarConexion);
+  pintarConexion();
+}
+
+/* ---------------- búsqueda por nombre ---------------- */
+function alternarBusqueda(){
+  var b = document.getElementById('busqueda');
+  b.style.display = (b.style.display === 'block') ? 'none' : 'block';
+  if (b.style.display === 'block') { document.getElementById('textoBusqueda').focus(); }
+}
+
+function buscar(){
+  var q = document.getElementById('textoBusqueda').value.trim().toLowerCase();
+  var caja = document.getElementById('hallazgos');
+  caja.innerHTML = '';
+  if (q.length < 3) { return; }
+
+  var n = 0;
+  for (var folio in padron){
+    if (!padron.hasOwnProperty(folio)) { continue; }
+    var f = padron[folio];
+    if (n >= 8) { break; }
+    if (folio.toLowerCase().indexOf(q) === -1 && f[2].toLowerCase().indexOf(q) === -1) { continue; }
+    n++;
+    var div = document.createElement('div');
+    div.className = 'hallazgo';
+    div.innerHTML = '<b>' + f[1] + ' ' + f[2] + '</b><small>' + folio + ' · ' + f[3] + ', ' + f[4] + '</small>';
+    (function(folioSel, ficha){
+      div.onclick = function(){ admitirManual(folioSel, ficha); };
+    })(folio, f);
+    caja.appendChild(div);
+  }
+  if (!n) { caja.innerHTML = '<div class="hallazgo"><small>Sin coincidencias.</small></div>'; }
+}
+
+function admitirManual(folio, ficha){
+  var llave = folio + '||' + sesionActual.sesion;
+  if (marcados[llave]){
+    sonar('aviso');
+    pintar('aviso', 'Ya había ingresado', ficha[2], 'Registrado a las ' + marcados[llave] + '.');
+    return;
+  }
+  var hora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+  marcados[llave] = hora;
+  guardar(K.marcados, marcados);
+  contadores.validos++; guardar(K.cont, contadores);
+
+  sonar('ok');
+  pintar('ok', 'Puede pasar · sin código', ficha[2], ficha[1] + ' · ' + ficha[3] + ', ' + ficha[4]);
+  encolar(folio, ficha[1], ficha[2], 'Válido');
+
+  document.getElementById('textoBusqueda').value = '';
+  document.getElementById('hallazgos').innerHTML = '';
+  document.getElementById('busqueda').style.display = 'none';
+}
+
+/* ---------------- modo entrada / salida ---------------- */
+var modo = 'Entrada';
+
+function alternarModo(){
+  modo = (modo === 'Entrada') ? 'Salida' : 'Entrada';
+  var aviso = document.getElementById('avisoModo');
+  var boton = document.getElementById('botonModo');
+  if (modo === 'Salida'){
+    aviso.textContent = 'Registrando SALIDAS anticipadas';
+    aviso.className = 'modo-salida';
+    boton.textContent = 'Volver a entradas';
+    document.body.classList.add('salida');
+  } else {
+    aviso.textContent = 'Registrando ENTRADAS';
+    aviso.className = 'modo-entrada';
+    boton.textContent = 'Cambiar a salidas';
+    document.body.classList.remove('salida');
+  }
+  ultimoCodigo = '';
+}
+
+/** Compara la hora del escaneo con el inicio de la toma. */
+function calcularPuntualidad(){
+  var s = null;
+  for (var i = 0; i < CFG.sesiones.length; i++){
+    if (etiquetaDe(CFG.sesiones[i]) === sesionActual.sesion){ s = CFG.sesiones[i]; break; }
+  }
+  if (!s || !s.inicio){ return { texto:'', minutos:'' }; }
+
+  var inicio = new Date(s.inicio.replace(' ', 'T'));
+  var min = Math.round((new Date().getTime() - inicio.getTime()) / 60000);
+  var margen = CFG.margen || 15;
+  return { texto: (min > margen) ? 'Retardo' : 'A tiempo', minutos: min };
+}
+
+/* ---------------- cambio de estudio ---------------- */
+function cambiarSesion(){
+  sesionActual.sesion = document.getElementById('sesionActiva').value;
+  guardar(K.sesion, sesionActual);
+  contadores = { validos:0, repetidos:0 };
+  guardar(K.cont, contadores);
+  refrescarContadores();
+  ultimoCodigo = '';
+  pintar('', 'Estudio cambiado', sesionActual.sesion,
+         'Los contadores vuelven a cero. Puede seguir escaneando.');
+}
+
+/* ---------------- salir ---------------- */
+function salir(){
+  if (cola.length){
+    if (!confirm('Quedan ' + cola.length + ' escaneos sin subir. Se conservan en este aparato hasta que vuelva a entrar con señal. ¿Cerrar de todos modos?')) { return; }
+  }
+  if (lector){ lector.stop().catch(function(){}); }
+  location.reload();
+}
+</script>
+</body>
+</html>
